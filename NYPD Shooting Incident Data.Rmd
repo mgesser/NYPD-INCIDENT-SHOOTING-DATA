@@ -1,0 +1,334 @@
+---
+title: "NYPD Shooting Incident Data"
+author: "Matthew Esser"
+date: "2023-10-16"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(dplyr)
+library(ggplot2)
+library(knitr)
+library(tidyr)
+library(dplyr)
+library(lubridate)
+library(zoo)
+```
+
+# LET'S GET STARTED!
+
+## IMPORT DATA
+
+Let's start by downloading the data from the url provided:
+
+```{r df, echo=TRUE}
+df <- read.csv('https://data.cityofnewyork.us/api/views/833y-fsy8/rows.csv?accessType=DOWNLOAD')
+```
+
+Now that we have our initial data, we'll call the summary function to get an overview of data.
+
+```{r Summary, echo=FALSE}
+summary(df)
+```
+
+Let's see an example of the data. *Using the head function*
+
+```{r echo=FALSE}
+head(df)
+```
+
+Now to keep in mind what data we are dealing with, let's list the names of the columns.
+
+**COLUMN NAMES:**
+
+1.  INCIDENT_KEY
+
+2.  OCCUR_DATE
+
+3.  OCCUR_TIME
+
+4.  BORO
+
+5.  LOC_OF_OCCUR_DESC
+
+6.  PRECINCT
+
+7.  JURISDICTION_CODE
+
+8.  LOC_CLASSFCTN_DESC
+
+9.  LOCATION_DESC
+
+10. STATISTICAL_MURDER_FLAG
+
+11. PERP_AGE_GROUP
+
+12. PERP_SEX
+
+13. PERP_RACE
+
+14. VIC_AGE_GROUP
+
+15. VIC_SEX
+
+16. VIC_RACE
+
+17. X_COORD_CD
+
+18. Y_COORD_CD
+
+19. Latitude
+
+20. Longitude
+
+21. Lon_Lat
+
+## CLEAN DATA
+
+In data science, I found it is good practice when modifying data to make an experimental copy. That way you have a base to return to if something goes wrong. Let's make a copy of the data using the data.frame function.
+
+```{r Data Copy, echo=TRUE}
+incidents <- data.frame(df)
+```
+
+When we get un-tidied data, it's not unusual to come across several values being used in place of Null. This cell below us will go through the data and replace any common Null substitutes with NA.
+
+```{r Consolidate NA}
+incidents[incidents == ""] <- NA
+incidents[incidents == "U"] <- NA
+incidents[incidents == "UNKNOWN"] <- NA
+incidents[incidents == "(null)"] <- NA
+incidents[incidents == "None"] <- NA
+```
+
+Now that we have found and replaced the common Null substitutes, let's see how much null data is in the dataframe per column.
+
+```{r Find NA, echo=FALSE}
+print(paste("INCIDENT_KEY",sum(is.na(incidents$INCIDENT_KEY))))
+print(paste("OCCUR_DATE",sum(is.na(incidents$OCCUR_DATE))))
+print(paste("OCCUR_TIME",sum(is.na(incidents$OCCUR_TIME))))
+print(paste("BORO",sum(is.na(incidents$BORO))))
+print(paste("LOC_OF_OCCUR_DESC",sum(is.na(incidents$LOC_OF_OCCUR_DESC))))
+print(paste("PRECINCT",sum(is.na(incidents$PRECINCT))))
+print(paste("JURISDICTION_CODE",sum(is.na(incidents$JURISDICTION_CODE))))
+print(paste("LOC_CLASSFCTN_DESC",sum(is.na(incidents$LOC_CLASSFCTN_DESC))))
+print(paste("LOCATION_DESC",sum(is.na(incidents$LOCATION_DESC))))
+print(paste("STATISTICAL_MURDER_FLAG",sum(is.na(incidents$STATISTICAL_MURDER_FLAG))))
+print(paste("PERP_AGE_GROUP",sum(is.na(incidents$PERP_AGE_GROUP))))
+print(paste("PERP_SEX",sum(is.na(incidents$PERP_SEX))))
+print(paste("PERP_RACE",sum(is.na(incidents$PERP_RACE))))
+print(paste("VIC_AGE_GROUP",sum(is.na(incidents$VIC_AGE_GROUP))))
+print(paste("VIC_SEX",sum(is.na(incidents$VIC_SEX))))
+print(paste("VIC_RACE",sum(is.na(incidents$VIC_RACE))))
+print(paste("X_COORD_CD",sum(is.na(incidents$X_COORD_CD))))
+print(paste("Y_COORD_CD",sum(is.na(incidents$Y_COORD_CD))))
+print(paste("Latitude",sum(is.na(incidents$Latitude))))
+print(paste("Longitude",sum(is.na(incidents$Longitude))))
+print(paste("Lon_Lat",sum(is.na(incidents$Lon_Lat))))
+```
+
+As you can see, some columns like INCIDENT_KEY have no missing values, while others like LOC_OF_OCCUR_DESC have more than 90% of their data missing!
+
+We have to make sure that the data is typed correctly, so let's run this cell to fix OCCUR_DATE.
+
+```{r Date Typing}
+incidents <- mutate(incidents,OCCUR_DATE = mdy(OCCUR_DATE))
+```
+
+One of the most important things to know in Data Science is when to drop features. Due to the high missing value count of LOC_OF_OCCUR_DESC and LOC_CLASS_FCTN_DESC, and the redundancy of Latitude,Longitude, and Lon_Lat we'll be removing these columns.
+
+```{r Dropping Columns}
+incidents <- incidents %>% subset(select=-c(LOC_OF_OCCUR_DESC,LOC_CLASSFCTN_DESC,Latitude,Longitude,Lon_Lat))
+```
+
+Now that we have gotten rid of the unnecessary columns, we can replace the NA values and incorrect data with values we are able to recognize and use.
+
+```{r Replacing NA}
+incidents$JURISDICTION_CODE<-replace(incidents$JURISDICTION_CODE, is.na(incidents$JURISDICTION_CODE), 0)
+incidents$VIC_AGE_GROUP<-replace(incidents$VIC_AGE_GROUP, incidents$VIC_AGE_GROUP=='1022', 'UNKNOWN')
+incidents$VIC_AGE_GROUP<-replace(incidents$VIC_AGE_GROUP, incidents$VIC_AGE_GROUP=='940', 'UNKNOWN')
+incidents$VIC_AGE_GROUP<-replace(incidents$VIC_AGE_GROUP, incidents$VIC_AGE_GROUP=='224', 'UNKNOWN')
+incidents$PERP_AGE_GROUP<-replace(incidents$PERP_AGE_GROUP, incidents$PERP_AGE_GROUP=='1020', 'UNKNOWN')
+incidents$PERP_AGE_GROUP<-replace(incidents$PERP_AGE_GROUP, incidents$PERP_AGE_GROUP=='940', 'UNKNOWN')
+incidents$PERP_AGE_GROUP<-replace(incidents$PERP_AGE_GROUP, incidents$PERP_AGE_GROUP=='224', 'UNKNOWN')
+incidents<-replace(incidents, is.na(incidents), 'UNKNOWN')
+incidents$VIC_SEX<-replace(incidents$VIC_SEX, incidents$VIC_SEX=='UNKNOWN', 'U')
+incidents$PERP_SEX<-replace(incidents$PERP_SEX, incidents$PERP_SEX=='UNKNOWN', 'U')
+```
+
+Let's run a quick value count on these columns to make sure we replaced the data properly.
+
+```{r}
+table(incidents$VIC_AGE_GROUP)
+table(incidents$PERP_AGE_GROUP)
+table(incidents$VIC_RACE)
+table(incidents$PERP_RACE)
+table(incidents$VIC_SEX)
+table(incidents$PERP_SEX)
+```
+
+```{r}
+summary(incidents)
+```
+
+## MODIFY DATA
+
+Now that our base data is all ready, let's work on creating our aggregation tables to find trends over time and demographic groups.
+
+We can start by adding Month and Year columns.
+
+```{r Adding Month and Year}
+incidents$MONTH <- month(incidents$OCCUR_DATE)
+incidents$YEAR <- year(incidents$OCCUR_DATE)
+```
+
+Let's then aggregate those columns into a month dataframe and year dataframe.
+
+```{r Time Data}
+month_count = incidents %>% group_by(MONTH)  %>%
+  summarise(total_incidents = n(),.groups = 'drop')
+year_count = incidents %>% group_by(YEAR)  %>%
+  summarise(total_incidents = n(),.groups = 'drop')
+df_grp_date = incidents %>% group_by(OCCUR_DATE)  %>%
+    summarise(total_incidents = n(),.groups = 'drop')
+```
+
+We'll also aggregate the demographics data for the victims and perps into their own tables.
+
+```{r Demographics Data}
+vic_race_count = incidents %>% group_by(VIC_RACE)  %>%
+  summarise(total_incidents = n(),.groups = 'drop')
+perp_race_count = incidents %>% group_by(PERP_RACE)  %>%
+  summarise(total_incidents = n(),.groups = 'drop')
+vic_sex_count = incidents %>% group_by(VIC_SEX)  %>%
+  summarise(total_incidents = n(),.groups = 'drop')
+perp_sex_count = incidents %>% group_by(PERP_SEX)  %>%
+  summarise(total_incidents = n(),.groups = 'drop')
+vic_age_count = incidents %>% group_by(VIC_AGE_GROUP)  %>%
+  summarise(total_incidents = n(),.groups = 'drop')
+perp_age_count = incidents %>% group_by(PERP_AGE_GROUP)  %>%
+  summarise(total_incidents = n(),.groups = 'drop')
+```
+
+```{r Join Demographics}
+race_count <- full_join(vic_race_count,perp_race_count,by=c('VIC_RACE'='PERP_RACE'))
+sex_count <- full_join(vic_sex_count,perp_sex_count,by=c("VIC_SEX"="PERP_SEX"))
+age_count <- full_join(vic_age_count,perp_age_count,by=c("VIC_AGE_GROUP"="PERP_AGE_GROUP"))
+```
+
+## ANALYZE DATA
+
+To get a big picture overview, here is a geographic scatter plot which clearly displays the incident map data. *To get a better understanding of this data, compare it against a map of New York.*
+
+```{r Map of Incidents, echo=TRUE}
+ggplot() + geom_point(data=incidents, aes(x=X_COORD_CD, y=Y_COORD_CD), color="red", size=1, alpha=0.5)
+```
+
+Let's now take a look at how incident rates change over time.
+
+First let's look at how the incident rates change throught a calendar year.
+
+```{r Month Counts, echo=TRUE}
+barplot(height=month_count$total_incidents,
+        col=c('blue'),
+        xlab='Month',
+        ylab='Incidents',
+        names=c('Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dev'))
+```
+
+As you can see, the data suggests that June thru August are the highest incident months. These are coincidentally some of the hottest months in New York leading to speculate a possible correlation between heat and violent crime.
+
+Now let's take a look at how the incident rate per year has changed over the past few years.
+
+```{r Year Counts, echo=TRUE}
+barplot(height=year_count$total_incidents,
+        col=c('blue'),
+        xlab='Year',
+        ylab='Incidents',
+        names=year_count$YEAR)
+```
+
+As you can see, the incident rate was steadily declining until 2020. This was during a period of high political tension and COVID-19, which may have influenced the incident rate.
+
+
+We should also take a look at demographics of victims and perpetrators and see how they compare.
+
+Let's first compare perp and vic race demographics.
+
+```{r Race Counts, echo=TRUE}
+cols <- c('red','blue')
+barplot(
+  t(race_count[c('total_incidents.x','total_incidents.y')]),
+  beside=T,
+  col=cols,
+  legend.text=c('VIC','PERP'),
+  ylab='Incidents',
+  names.arg=race_count$VIC_RACE,
+  cex.names = 0.5,
+  las=2)
+```
+
+As you can see from data, black people seem to be the most likely to be victims of an incident. In many cases, it seems the race of a perpetrator is unknown.
+
+
+Let's first compare perp and vic gender demographics.
+
+```{r Sex Counts, echo=TRUE}
+cols <- c('red','blue')
+barplot(
+  t(sex_count[c('total_incidents.x','total_incidents.y')]),
+  beside=T,
+  col=cols,
+  xlab='Sex',
+  ylab='Incidents',
+  legend.text=c('VIC','PERP'),
+  names.arg=sex_count$VIC_SEX)
+```
+
+It appears from the data that men are more likely to be a victim or perpetrator of a shooting incident than women.
+
+Let's first compare perp and vic age demographics.
+
+```{r Age Counts, echo=TRUE}
+cols <- c('red','blue')
+barplot(
+  t(age_count[c('total_incidents.x','total_incidents.y')]),
+  beside=T,
+  col=cols,
+  legend.text=c('VIC','PERP'),
+  xlab='Age',
+  ylab='Incidents',
+  names.arg=age_count$VIC_AGE_GROUP,
+  las=2)
+```
+
+The data suggests that people aged 18-44 are much more likely to be a perpetrator or victim of a shooting incident. But in most cases, it seems the age group of the perpetrator is unknown. 
+
+## MODEL DATA
+
+Let's use our date aggregated data to find a best fit line for incident rates over time.
+
+Start by creating a linear regression model.
+```{r Create Linear Regression Model}
+mod <- lm(total_incidents~OCCUR_DATE,data=df_grp_date)
+summary(mod)
+```
+
+Create a database to store expected and actual values.
+```{r Create Predictions}
+df_pred <- df_grp_date %>% mutate(pred= predict(mod))
+```
+
+Plot expected values vs actual values and see how the trend operates.
+```{r Linear Regression Plot, echo=TRUE}
+df_pred %>% ggplot() + geom_point(aes(x=OCCUR_DATE,y=total_incidents),color="blue") + geom_point(aes(x=OCCUR_DATE,y=pred),color="red")
+```
+
+As the linear model suggests, despite a recent hike in 2020 incident rates in New York are on a downward trend.
+
+## CONCLUSION
+
+This data has revealed a great deal about shooting incidents in New York. While it certainly suggests that shooting that black people and men are much more likely to be victims or perpetrators of incidents, we need to be wary of bias. The most obvious opportunity for bias is in the perpetrator demographics. For perpetrators not caught or wrongfully arrested, this can be highly influenced by the implicit biases of eye-witness testimony. However we can also see that shooting incidents seem to be on a downward trend.
